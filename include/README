@@ -1,0 +1,74 @@
+# `src/` Directory – ESP32-CAM MVC Project
+
+This folder contains the **source code (`.cpp`) files** for the ESP32-CAM project.  
+The project follows the **Model–View–Controller (MVC)** architecture to keep code modular, efficient, and professional.
+
+---
+
+## File Structure
+
+src/
+├── main.cpp # Entry point: calls controller init and loop
+├── model.cpp # Implements device configuration and state
+├── view.cpp # Handles hardware I/O (LED, button, Serial)
+├── controller.cpp # Core logic: Wi-Fi, camera, HTTP POST, JSON parsing
+
+
+Each `.cpp` file includes its corresponding header file from the `include/` directory.
+
+---
+
+## MVC Responsibilities
+
+- **Model (`model.cpp`)**
+  - Holds `AppConfig` (Wi-Fi credentials, server URL, retries, capture intervals, image quality).
+  - Holds `DeviceState` (LED state, button state, Wi-Fi state).
+  - Provides `initModel()` for initialization.
+
+- **View (`view.cpp`)**
+  - Maps model state to hardware.
+  - Serial output, LED indication, button input (with debounce).
+  - Keeps user interaction and feedback separate from logic.
+
+- **Controller (`controller.cpp`)**
+  - Connects to Wi-Fi.
+  - Initializes and configures ESP32-CAM.
+  - Captures images, uploads to XAMPP server using HTTP POST.
+  - Parses server’s JSON response (via ArduinoJson).
+  - Updates model (e.g., sets LED alert flag).
+  - Optimizes system with **exponential backoff** and **resolution scaling** based on latency.
+
+- **Main (`main.cpp`)**
+  - Entry point:  
+    - `setup()` calls `initController()`.  
+    - `loop()` runs `controllerLoop()` continuously.
+
+---
+
+## Task Mapping
+
+✔ **Flash ESP32-CAM, confirm local streaming** → handled in `controller.cpp`.  
+✔ **Implement HTTP POST upload to server** → done in `controller.cpp`.  
+✔ **Parse server JSON response (LED/Serial)** → JSON handled in `controller.cpp`, LED updated via `view.cpp`.  
+✔ **Optimize (latency, resolution scaling, retries)** → adaptive tier control + exponential backoff implemented in `controller.cpp`.  
+
+---
+
+## Best Practices in This Codebase
+
+- **MVC separation** → modular, easy to maintain.
+- **Header/source split** → declarations in `include/`, definitions in `src/`.
+- **Efficient memory handling** → camera buffers are always returned with `esp_camera_fb_return()`.
+- **Scalable & professional style** → clean comments, clear logic, company-ready structure.
+
+---
+
+## How It Connects to `include/`
+
+Each `.cpp` pulls declarations from the `include/` headers. For example:
+
+```cpp
+// src/controller.cpp
+#include "controller.h"
+#include "model.h"
+#include "view.h"
