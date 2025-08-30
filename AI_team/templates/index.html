@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YOLO Detection</title>
+</head>
+<body>
+    <h2>Upload Image for Prediction</h2>
+    <form action="/predict" method="post" enctype="multipart/form-data">
+        <input type="file" name="image" required>
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if prediction_result %}
+        <h3>Prediction Result:</h3>
+        <img src="{{ prediction_result }}" width="500">
+    {% endif %}
+</body>
+</html>
