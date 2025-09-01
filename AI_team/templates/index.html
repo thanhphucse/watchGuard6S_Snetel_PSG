@@ -1,18 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>YOLO Detection</title>
+    <title>YOLOv8 Live Detection</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; background: #f0f0f0; }
+        #videoFeed { margin: 20px auto; border: 2px solid black; display: inline-block; }
+        .btn { padding: 10px 20px; margin: 10px; font-size: 18px; cursor: pointer; }
+        .on { background-color: green; color: white; }
+        .off { background-color: red; color: white; }
+    </style>
 </head>
 <body>
-    <h2>Upload Image for Prediction</h2>
-    <form action="/predict" method="post" enctype="multipart/form-data">
-        <input type="file" name="image" required>
-        <button type="submit">Predict</button>
-    </form>
+    <h1>YOLOv8 Real-Time Webcam Detection</h1>
 
-    {% if prediction_result %}
-        <h3>Prediction Result:</h3>
-        <img src="{{ prediction_result }}" width="500">
-    {% endif %}
+    <div id="videoFeed">
+        <img id="camera" src="{{ url_for('video') }}" width="640" height="480">
+    </div>
+
+    <br>
+    <button class="btn on" onclick="turnOn()">ON</button>
+    <button class="btn off" onclick="turnOff()">OFF</button>
+
+    <script>
+        function turnOn() {
+            document.getElementById('camera').src = "{{ url_for('video') }}";
+        }
+        function turnOff() {
+            document.getElementById('camera').src = "";
+        }
+    </script>
 </body>
 </html>
