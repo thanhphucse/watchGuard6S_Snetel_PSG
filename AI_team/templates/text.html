@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robot Control UI + Detection Overlay</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Left Panel (Video Area) */
+    #video-container {
+      flex: 1;
+      background: #003366; /* Dark Blue */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    #video-frame {
+      width: 90%;
+      height: 90%;
+      background: black; /* Black placeholder initially */
+      border: 4px solid white;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #video-stream {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none; /* hidden until connection ON */
+      border-radius: 8px;
+    }
+
+    /* Bottom overlay for detections */
+    #caption {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      color: #00ffcc;
+      text-align: center;
+      font-size: 1.5rem;
+      padding: 8px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    #avatar {
+      width: 40px;
+      height: 40px;
+      display: none;
+    }
+
+    /* Right Panel (Controls) */
+    #control-panel {
+      flex: 1;
+      background: white;
+      padding: 20px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 30px;
+    }
+
+    h2 {
+      color: #003366;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    #connection-btn.on {
+      background: green;
+      color: white;
+    }
+    #connection-btn.off {
+      background: red;
+      color: white;
+    }
+
+    /* Speed slider */
+    #speed-control {
+      width: 250px;
+    }
+
+    /* Flex container for Movement + Rotation */
+    .controls-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 50px;
+    }
+
+    /* Movement grid */
+    .movement-controls {
+      display: grid;
+      grid-template-columns: 80px 80px 80px;
+      grid-template-rows: 80px 80px 80px;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+    .movement-controls button {
+      font-size: 1.5rem;
+      background: #003366;
+      color: white;
+    }
+
+    /* Rotation controls */
+    .rotation-controls {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+    .rotation-controls button {
+      font-size: 1.5rem;
+      background: #003366;
+      color: white;
+      width: 80px;
+      height: 80px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Half (Video Feed / Placeholder) -->
+  <div id="video-container">
+    <div id="video-frame">
+      <img id="video-stream" src="{{ url_for('video') }}" alt="Video Stream">
+      <!-- Detection Overlay -->
+      <div id="caption">
+        <img id="avatar" src="" alt="Avatar">
+        <span id="caption-text">Waiting for detections...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Half (Controls) -->
+  <div id="control-panel">
+    <div>
+      <h2>Connection</h2>
+      <button id="connection-btn" class="off">Connection OFF</button>
+    </div>
+
+    <div>
+      <h2>Speed Control</h2>
+      <input type="range" id="speed-control" min="0" max="100" value="50">
+    </div>
+
+    <div class="controls-row">
+      <div>
+        <h2>Movement</h2>
+        <div class="movement-controls">
+          <div></div>
+          <button onclick="move('up')">⬆️</button>
+          <div></div>
+          <button onclick="move('left')">⬅️</button>
+          <button id="play-pause-btn" onclick="togglePlayPause()">⏸️</button>
+          <button onclick="move('right')">➡️</button>
+          <div></div>
+          <button onclick="move('down')">⬇️</button>
+          <div></div>
+        </div>
+      </div>
+
+      <div>
+        <h2>Rotation</h2>
+        <div class="rotation-controls">
+          <button onclick="rotate('left')">↺</button>
+          <button onclick="rotate('right')">↻</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const videoStream = document.getElementById("video-stream");
+    const connectionBtn = document.getElementById("connection-btn");
+    const playPauseBtn = document.getElementById("play-pause-btn");
+    const captionText = document.getElementById("caption-text");
+    const avatarImg = document.getElementById("avatar");
+
+    let isConnected = false;
+    let isPaused = true;
+    let lastSpoken = "";
+
+    // Avatar mapping
+    function getAvatar(className) {
+      const avatarMap = {
+        fire: "https://cdn-icons-png.flaticon.com/512/482/482059.png",
+        smoke: "https://cdn-icons-png.flaticon.com/512/869/869869.png",
+        person: "https://cdn-icons-png.flaticon.com/512/1077/1077012.png",
+        wire: "https://cdn-icons-png.flaticon.com/512/711/711284.png",
+        default: "https://cdn-icons-png.flaticon.com/512/565/565654.png"
+      };
+      return avatarMap[className.toLowerCase()] || avatarMap["default"];
+    }
+
+    // Voice function
+    function speak(text) {
+      if (text === lastSpoken) return; // avoid repeat
+      lastSpoken = text;
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      synth.speak(utterance);
+    }
+
+    // Fetch detections
+    async function fetchDetection() {
+      try {
+        const response = await fetch("/latest_detection");
+        const data = await response.json();
+
+        if (data.class && data.confidence) {
+          captionText.innerText = data.class;
+          avatarImg.src = getAvatar(data.class);
+          avatarImg.style.display = "inline";
+          speak(`${data.class} detected`);
+        } else {
+          captionText.innerText = "No detection";
+          avatarImg.style.display = "none";
+          lastSpoken = "";
+        }
+      } catch (error) {
+        console.error("Error fetching detection:", error);
+      }
+    }
+
+    setInterval(fetchDetection, 3000); // fetch every 3 sec
+
+    // Connection button
+    connectionBtn.addEventListener("click", () => {
+      isConnected = !isConnected;
+      if (isConnected) {
+        videoStream.style.display = "block";
+        connectionBtn.textContent = "Connection ON";
+        connectionBtn.className = "on";
+      } else {
+        videoStream.style.display = "none";
+        connectionBtn.textContent = "Connection OFF";
+        connectionBtn.className = "off";
+      }
+    });
+
+    // Toggle play/pause
+    function togglePlayPause() {
+      isPaused = !isPaused;
+      playPauseBtn.textContent = isPaused ? "⏸️" : "▶️";
+      console.log("Robot", isPaused ? "Paused" : "Playing");
+    }
+
+    // Movement actions
+    function move(direction) {
+      console.log("Move:", direction);
+    }
+
+    // Rotation actions
+    function rotate(direction) {
+      console.log("Rotate:", direction);
+    }
+  </script>
+</body>
+</html>
