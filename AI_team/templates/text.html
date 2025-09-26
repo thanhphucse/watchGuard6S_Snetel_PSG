@@ -146,13 +146,69 @@
       width: 80px;
       height: 80px;
     }
+
+    /* Camera controls */
+    .camera-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .camera-middle {
+      display: flex;
+      gap: 10px;
+    }
+
+    .camera-controls button {
+      width: 60px;
+      height: 60px;
+      background: #004488;
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    .camera-controls button:hover {
+      background: #005599;
+    }
+
+    /* Sensor distances */
+    .sensors-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: stretch;
+      margin-top: 18px;
+      width: 100%;
+    }
+    .sensor-box {
+      background: #f6fbff;
+      border: 1px solid #d8e9f5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      min-width: 110px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .sensor-label {
+      color: #003366;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+    }
+    .sensor-value {
+      color: #0077aa;
+      font-weight: 800;
+      font-size: 1.25rem;
+    }
   </style>
 </head>
 <body>
   <!-- Left Half (Video Feed / Placeholder) -->
   <div id="video-container">
     <div id="video-frame">
-      <img id="video-stream" src="{{ url_for('video') }}" alt="Video Stream">
+      <img id="video-stream" src="http://192.168.18.115:81/stream" alt="Video Stream">
       <!-- Detection Overlay -->
       <div id="caption">
         <img id="avatar" src="" alt="Avatar">
@@ -196,10 +252,44 @@
           <button onclick="rotate('right')">↻</button>
         </div>
       </div>
+
+      <div>
+        <h2>Camera pan-tilt Control</h2>
+        <div class="camera-controls">
+          <button onclick="camera('up')">🔼</button>
+          <div class="camera-middle">
+            <button onclick="camera('left')">◀️</button>
+            <button onclick="camera('center')">⦿</button>
+            <button onclick="camera('right')">▶️</button>
+          </div>
+          <button onclick="camera('down')">🔽</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sensor distances -->
+    <div class="sensors-row" id="sensors-row">
+      <div class="sensor-box">
+        <span class="sensor-label">Front</span>
+        <span class="sensor-value" id="front-distance">-- cm</span>
+      </div>
+      <div class="sensor-box">
+        <span class="sensor-label">Back</span>
+        <span class="sensor-value" id="back-distance">-- cm</span>
+      </div>
+      <div class="sensor-box">
+        <span class="sensor-label">Left</span>
+        <span class="sensor-value" id="left-distance">-- cm</span>
+      </div>
+      <div class="sensor-box">
+        <span class="sensor-label">Right</span>
+        <span class="sensor-value" id="right-distance">-- cm</span>
+      </div>
     </div>
   </div>
 
   <script>
+    const ESP32_SERVER_URL = "http://192.168.18.109";
     const videoStream = document.getElementById("video-stream");
     const connectionBtn = document.getElementById("connection-btn");
     const playPauseBtn = document.getElementById("play-pause-btn");
@@ -271,22 +361,121 @@
       }
     });
 
-    // Toggle play/pause
-    function togglePlayPause() {
-      isPaused = !isPaused;
+    // Add stop function for play/pause button
+    async function togglePlayPause() {
+      // isPaused = !isPaused;
       playPauseBtn.textContent = isPaused ? "⏸️" : "▶️";
-      console.log("Robot", isPaused ? "Paused" : "Playing");
+      
+      if (!isConnected) return;
+
+      if (isPaused) {
+        try {
+          const response = await fetch(`${ESP32_SERVER_URL}/robot/stop`, {
+            method: 'GET'
+          });
+          if (!response.ok) throw new Error('response error');
+        } catch (error) {
+          console.error("Error stopping robot:", error);
+        }
+      }
     }
 
     // Movement actions
-    function move(direction) {
-      console.log("Move:", direction);
+    async function move(direction) {
+      // if (!isConnected) return;
+      let endpoint = "";
+      switch(direction) {
+        case "up": endpoint = "/robot/forward"; break;
+        case "down": endpoint = "/robot/backward"; break;
+        case "left": endpoint = "/robot/left"; break;
+        case "right": endpoint = "/robot/right"; break;
+      }
+
+      try {
+        const response = await fetch(`${ESP32_SERVER_URL}${endpoint}`, {
+          method: 'GET'
+        });
+        if (!response.ok) throw new Error('response error');
+        else{
+          console.log(`Robot moving ${direction}`);
+        }
+      } catch (error) {
+        console.error("Error moving robot:", error);
+      }
     }
 
     // Rotation actions
-    function rotate(direction) {
-      console.log("Rotate:", direction);
+    async function rotate(direction) {
+      // if (!isConnected) return;
+      const endpoint = direction === "left" ? "/robot/left_90" : "/robot/right_90";
+      try {
+        const response = await fetch(`${ESP32_SERVER_URL}${endpoint}`, {
+          method: 'GET'
+        });
+        if (!response.ok) throw new Error('response error');
+        else{
+          console.log(`Robot rotating ${direction}`);
+        }
+      } catch (error) {
+        console.error("Error rotating robot:", error);
+      }
     }
+
+    // Camera control actions
+    async function camera(direction) {
+      // if (!isConnected) return;
+      try {
+        const response = await fetch(`${ESP32_SERVER_URL}/camera/${direction}`, {
+          method: 'GET'
+        });
+        if (!response.ok) throw new Error('response error');
+        else{
+          console.log(`Camera moving ${direction}`);
+        }
+      } catch (error) {
+        console.error("Error moving camera:", error);
+      }
+    }
+
+    // Add speed control handler
+    document.getElementById("speed-control").addEventListener("change", async function(e) {
+      // if (!isConnected) return;
+      try {
+        const response = await fetch(`${ESP32_SERVER_URL}/robot/speed`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `speed=${e.target.value}`
+        });
+        if (!response.ok) throw new Error('response error');
+        else{
+          console.log(`Speed set to ${e.target.value}`);
+        }
+      } catch (error) {
+        console.error("Error setting speed:", error);
+      }
+    });
+
+    // --- Sensor data fetching (added) ---
+    async function fetchSensorData() {
+      try {
+        const res = await fetch(`${ESP32_SERVER_URL}/sensor/data`, { method: 'GET' });
+        if (!res.ok) throw new Error('response error');
+        const data = await res.json();
+        if (typeof data === 'object') {
+          document.getElementById('front-distance').innerText = (data.front_sensor ?? '--') + ' ' + (data.unit ?? 'cm');
+          document.getElementById('back-distance').innerText  = (data.back_sensor  ?? '--') + ' ' + (data.unit ?? 'cm');
+          document.getElementById('left-distance').innerText  = (data.left_sensor  ?? '--') + ' ' + (data.unit ?? 'cm');
+          document.getElementById('right-distance').innerText = (data.right_sensor ?? '--') + ' ' + (data.unit ?? 'cm');
+        }
+      } catch (err) {
+        console.warn('fetchSensorData error:', err);
+      }
+    }
+
+    // Start polling sensor data every 0.5s
+    setInterval(fetchSensorData, 500);
   </script>
 </body>
 </html>
