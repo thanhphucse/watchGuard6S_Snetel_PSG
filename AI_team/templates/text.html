@@ -208,7 +208,7 @@
   <!-- Left Half (Video Feed / Placeholder) -->
   <div id="video-container">
     <div id="video-frame">
-      <img id="video-stream" src="http://192.168.18.115:81/stream" alt="Video Stream">
+      <img id="video-stream" src="{{ url_for('video') }}" alt="Video Stream">
       <!-- Detection Overlay -->
       <div id="caption">
         <img id="avatar" src="" alt="Avatar">
@@ -216,7 +216,7 @@
       </div>
     </div>
   </div>
-
+  
   <!-- Right Half (Controls) -->
   <div id="control-panel">
     <div>
@@ -234,13 +234,13 @@
         <h2>Movement</h2>
         <div class="movement-controls">
           <div></div>
-          <button onclick="move('up')">⬆️</button>
+          <button onmousedown="move('up')" onmouseup="togglePlayPause()">⬆️</button>
           <div></div>
-          <button onclick="move('left')">⬅️</button>
-          <button id="play-pause-btn" onclick="togglePlayPause()">⏸️</button>
-          <button onclick="move('right')">➡️</button>
+          <button onmousedown="move('left')" onmouseup="togglePlayPause()">⬅️</button>
+          <button id="play-pause-btn" onclick="togglePlayPause()">▶️</button>
+          <button onmousedown="move('right')" onmouseup="togglePlayPause()">➡️</button>
           <div></div>
-          <button onclick="move('down')">⬇️</button>
+          <button onmousedown="move('down')" onmouseup="togglePlayPause()">⬇️</button>
           <div></div>
         </div>
       </div>
@@ -256,13 +256,13 @@
       <div>
         <h2>Camera pan-tilt Control</h2>
         <div class="camera-controls">
-          <button onclick="camera('up')">🔼</button>
+          <button onmousedown="camera('up')" onmouseup="stopRotateCamera()">🔼</button>
           <div class="camera-middle">
-            <button onclick="camera('left')">◀️</button>
+            <button onmousedown="camera('left')" onmouseup="stopRotateCamera()">◀️</button>
             <button onclick="camera('center')">⦿</button>
-            <button onclick="camera('right')">▶️</button>
+            <button onmousedown="camera('right')" onmouseup="stopRotateCamera()">▶️</button>
           </div>
-          <button onclick="camera('down')">🔽</button>
+          <button onmousedown="camera('down')" onmouseup="stopRotateCamera()">🔽</button>
         </div>
       </div>
     </div>
@@ -345,8 +345,7 @@
       }
     }
 
-    setInterval(fetchDetection, 3000); // fetch every 3 sec
-
+    setInterval(fetchDetection, 500); // fetch every 0.5s
     // Connection button
     connectionBtn.addEventListener("click", () => {
       isConnected = !isConnected;
@@ -363,10 +362,10 @@
 
     // Add stop function for play/pause button
     async function togglePlayPause() {
-      // isPaused = !isPaused;
-      playPauseBtn.textContent = isPaused ? "⏸️" : "▶️";
+      isPaused = !isPaused;
+      playPauseBtn.textContent = "▶️";
       
-      if (!isConnected) return;
+      // if (!isConnected) return;
 
       if (isPaused) {
         try {
@@ -390,6 +389,8 @@
         case "left": endpoint = "/robot/left"; break;
         case "right": endpoint = "/robot/right"; break;
       }
+      playPauseBtn.textContent = "⏸️";
+      isPaused = false;
 
       try {
         const response = await fetch(`${ESP32_SERVER_URL}${endpoint}`, {
@@ -408,6 +409,9 @@
     async function rotate(direction) {
       // if (!isConnected) return;
       const endpoint = direction === "left" ? "/robot/left_90" : "/robot/right_90";
+      playPauseBtn.textContent = "⏸️";
+      isPaused = false;
+
       try {
         const response = await fetch(`${ESP32_SERVER_URL}${endpoint}`, {
           method: 'GET'
@@ -415,6 +419,10 @@
         if (!response.ok) throw new Error('response error');
         else{
           console.log(`Robot rotating ${direction}`);
+          setTimeout(() => {
+            playPauseBtn.textContent = "▶️";
+            isPaused = true;
+          }, 2000);
         }
       } catch (error) {
         console.error("Error rotating robot:", error);
@@ -434,6 +442,21 @@
         }
       } catch (error) {
         console.error("Error moving camera:", error);
+      }
+    }
+
+    async function stopRotateCamera() {
+      // if (!isConnected) return;
+      try {
+        const response = await fetch(`${ESP32_SERVER_URL}/camera/stop_rotate`, {
+          method: 'GET'
+        });
+        if (!response.ok) throw new Error('response error');
+        else{
+          console.log(`Camera rotation stopped`);
+        }
+      } catch (error) {
+        console.error("Error stopping camera rotation:", error);
       }
     }
 
